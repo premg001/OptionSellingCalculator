@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Option Averaging Calculator</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { background:#0b0e11; color:#d1d4dc; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+  .card { background:#131722; border:1px solid #2a2e39; border-radius:8px; padding:16px; }
+  .lbl { display:block; font-size:12px; color:#787b86; margin-bottom:4px; }
+  .inp { width:100%; background:#0b0e11; border:1px solid #2a2e39; border-radius:6px; padding:8px; color:#d1d4dc; font-family:ui-monospace,Menlo,monospace; outline:none; }
+  .inp:focus { border-color:#2962ff; }
+  .up { color:#26a69a; } .down { color:#ef5350; } .warn { color:#f5a623; } .muted { color:#787b86; }
+  table { width:100%; border-collapse:collapse; font-family:ui-monospace,Menlo,monospace; font-size:13px; }
+  th { text-align:right; color:#787b86; font-weight:normal; padding:6px; }
+  td { text-align:right; padding:6px; border-top:1px solid #2a2e39; }
+  th:first-child, td:first-child { text-align:left; }
+</style>
+</head>
+<body class="antialiased">
+<div class="mx-auto max-w-3xl space-y-4 p-4">
+
+  <h1 class="text-lg font-semibold">Option Averaging Calculator</h1>
+
+  <!-- INPUTS -->
+  <div class="card grid grid-cols-2 gap-3 md:grid-cols-3">
+    <label><span class="lbl">Spot price</span><input id="spot" type="number" class="inp" value="24000"></label>
+    <label><span class="lbl">Lot size</span><input id="lot" type="number" class="inp" value="75"></label>
+    <div></div>
+
+    <label><span class="lbl">Entry 1 distance %</span><input id="d1" type="number" step="any" class="inp" value="0.5"></label>
+    <label><span class="lbl">Entry 1 lots sold</span><input id="l1" type="number" class="inp" value="1"></label>
+    <label><span class="lbl">Entry 1 premium (pts)</span><input id="p1" type="number" step="any" class="inp" value="110"></label>
+
+    <label><span class="lbl">Entry 2 distance %</span><input id="d2" type="number" step="any" class="inp" value="1"></label>
+    <label><span class="lbl">Entry 2 premium (pts)</span><input id="p2" type="number" step="any" class="inp" value="60"></label>
+    <label><span class="lbl">Target avg distance %</span><input id="t" type="number" step="any" class="inp" value="0.8"></label>
+
+    <label><span class="lbl">Max total lots</span><input id="maxLots" type="number" class="inp" value="10"></label>
+    <label><span class="lbl">Margin per lot (₹)</span><input id="mpl" type="number" class="inp" value="120000"></label>
+    <label><span class="lbl">Max margin (₹)</span><input id="maxM" type="number" class="inp" value="500000"></label>
+  </div>
+
+  <!-- ANSWER -->
+  <div class="card" id="answer"></div>
+
+  <!-- SPOT-BASED SUMMARY -->
+  <div class="card" id="spotSummary"></div>
+
+  <!-- SUMMARY -->
+  <div class="card" id="summary"></div>
+
+  <!-- RECOVERY -->
+  <div class="card">
+    <h2 class="mb-2 text-sm font-semibold">Profit / loss at expiry by adverse move</h2>
+    <div id="recovery"></div>
+    <p class="mt-2 text-xs muted">Expiry values only. Ignores brokerage, taxes, and slippage. Not financial advice.</p>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const V = id => { const s = $(id).value; return s === '' ? NaN : Number(s); };
+const inr = n => Number.isFinite(n) ? Math.round(n).toLocaleString('en-IN') : '—';
+const pct = n => Number.isFinite(n) ? n.toFixed(2) + '%' : '—';
+const LEVELS = [0.5, 1, 1.5, 2, 3, 4];
+
+// Adverse-move P&L (currency) for short legs at expiry.
+function pnlAt(legs, spot, lot, m) {
+  let prem = 0, intr = 0;
+  for (const l of legs) {
+    prem += l.lots * l.prem;
+    intr += l.lots * Math.max(0, m - l.dist) * spot / 100;
+  }
+  return (prem - intr) * lot;
+}
+
+// Adverse move at which expiry P&L reaches zero.
+function breakEven(legs, spot, lot) {
+  let lo = 0, hi = 100;
+  if (pnlAt(legs, spot, lot, lo) <= 0) return NaN;
+  for (let k = 0; k < 100; k++) {
+    const mid = (lo + hi) / 2;
+    if (pnlAt(legs, spot, lot, mid) > 0) lo = mid; else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
+function render() {
+  const spot = V('spot'), lot = V('lot');
+  const d1 = V('d1'), l1 = V('l1'), p1 = V('p1');
+  const d2 = V('d2'), p2 = V('p2'), t = V('t');
+  const maxLots = V('maxLots'), mpl = V('mpl'), maxM = V('maxM');
+
+  // Basic checks, shown as a single message.
+  let err = '';
+  if (!(d1 > 0) || !(d2 > d1)) err = 'Entry 2 distance must be greater than Entry 1 distance.';
+  else if (!(l1 >= 1)) err = 'Entry 1 lots must be at least 1.';
+  else if (!(t > d1 && t < d2)) err = `Target must lie between ${d1}% and ${d2}%.`;
+  else if (!(mpl > 0)) err = 'Margin per lot must be greater than 0.';
+
+  if (err) {
+    $('answer').innerHTML = `<p class="down">${err}</p>`;
+    $('spotSummary').innerHTML = '';
+    $('summary').innerHTML = '';
+    $('recovery').innerHTML = '';
+    return;
+  }
+
+  // Core formula: A = L1 × (Target − d1) / (d2 − Target)
+  const raw = l1 * (t - d1) / (d2 - t);
+  const need = Math.max(0, Math.round(raw));
+  const marginLeft = maxM - l1 * mpl;
+  const cap = Math.max(0, Math.min(maxLots - l1, Math.floor(marginLeft / mpl)));
+  const add = Math.min(need, cap);
+  const total = l1 + add;
+
+  const avgD = (l1 * d1 + add * d2) / total;
+  const avgP = (l1 * p1 + add * p2) / total;
+  const legs = [{ lots: l1, dist: d1, prem: p1 }, { lots: add, dist: d2, prem: p2 }];
+  const be = breakEven(legs, spot, lot);
+  const margin = total * mpl;
+  const premium = (l1 * p1 + add * p2) * lot;
+
+  $('answer').innerHTML = `
+    <div class="text-sm muted">Sell at ${d2}% to bring average to ${t}%</div>
+    <div class="text-5xl font-bold my-2">${add} <span class="text-lg font-normal muted">lots</span></div>
+    <div class="text-sm">Exact solution: ${raw.toFixed(2)} lots, rounded to ${need}.</div>
+    ${add < need ? `<div class="warn text-sm mt-1">Only ${add} lot(s) fit your lot or margin limits. The target is not fully reached.</div>` : ''}
+    ${need === 0 ? `<div class="muted text-sm mt-1">Entry 1 alone is already at or beyond the target. No averaging needed.</div>` : ''}`;
+
+  // Price levels derived from spot. Assumes CALL options (strikes above spot).
+  const px = pctMove => spot * (1 + pctMove / 100);
+  const pxTxt = v => Number.isFinite(v) ? '₹' + inr(v) : '—';
+  const bePx = px(be);
+  const lvl = m => spot * (1 + m / 100);
+  $('spotSummary').innerHTML = `
+    <h2 class="mb-2 text-sm font-semibold">Summary based on spot price</h2>
+    <p class="mb-2 text-xs muted">Spot now: ₹${inr(spot)}. Levels assume call options, so strikes sit above spot.</p>
+    <table>
+      <tr><td>Entry 1 level (${d1}% above spot)</td><td>${pxTxt(lvl(d1))}</td></tr>
+      <tr><td>Entry 2 level (${d2}% above spot)</td><td>${pxTxt(lvl(d2))}</td></tr>
+      <tr><td>Target average level (${t}% above spot)</td><td>${pxTxt(lvl(t))}</td></tr>
+      <tr><td>Break-even spot at expiry (${pct(be)} above)</td><td class="warn">${pxTxt(bePx)}</td></tr>
+    </table>
+    <p class="mt-2 text-xs muted">Below the break-even spot at expiry, the position makes a profit. Above it, you lose money.</p>`;
+
+  $('summary').innerHTML = `
+    <h2 class="mb-2 text-sm font-semibold">Summary</h2>
+    <table>
+      <tr><td>Total lots after averaging</td><td>${total}</td></tr>
+      <tr><td>Achieved avg distance</td><td class="up">${pct(avgD)}</td></tr>
+      <tr><td>Achieved avg premium</td><td>${(l1 * p1 + add * p2) / total === 0 ? '—' : ((l1 * p1 + add * p2) / total).toFixed(2) + ' pts'}</td></tr>
+      <tr><td>Total premium collected</td><td class="up">₹${inr(premium)}</td></tr>
+      <tr><td>Margin required</td><td>₹${inr(margin)}</td></tr>
+      <tr><td>Margin left</td><td class="${maxM - margin < 0 ? 'down' : ''}">₹${inr(maxM - margin)}</td></tr>
+      <tr><td>Break-even adverse move</td><td>${pct(be)}</td></tr>
+    </table>`;
+
+  $('recovery').innerHTML = `
+    <table>
+      <tr><th>Move</th><th>Entry 1 only</th><th>After averaging</th></tr>
+      ${LEVELS.map(m => {
+        const only = pnlAt([{ lots: l1, dist: d1, prem: p1 }], spot, lot, m);
+        const after = pnlAt(legs.map(l => ({ ...l, lots: m >= l.dist || l === legs[0] ? l.lots : 0 })), spot, lot, m);
+        return `<tr>
+          <td>${m}%</td>
+          <td class="${only >= 0 ? 'up' : 'down'}">₹${inr(only)}</td>
+          <td class="${after >= 0 ? 'up' : 'down'}">₹${inr(after)}</td>
+        </tr>`;
+      }).join('')}
+    </table>`;
+}
+
+document.addEventListener('input', render);
+render();
+</script>
+</body>
+</html>
