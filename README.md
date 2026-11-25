@@ -28,8 +28,8 @@ git push -u origin main
 
 ## 3. Host it free with GitHub Pages
 
-The included GitHub Actions workflow deploys the site automatically whenever you push to the `main` branch. After the first deployment, open [the calculator](https://premg001.github.io/OptionSellingCalculator/Option_Averaging_Simple.html).
-If prompted, enable GitHub Pages for the repository and allow GitHub Actions to deploy it.
+The included GitHub Actions workflow deploys the site automatically whenever you push to `main` or `option-Selling-calculator`. After deployment, open [the calculator](https://premg001.github.io/OptionSellingCalculator/). The root page redirects to `Option_Averaging_Simple.html`.
+The repository's GitHub Pages source must be set to **GitHub Actions** under **Settings → Pages**.
 
 ## 4. Updating later
 
