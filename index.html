@@ -3,10 +3,59 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="refresh" content="0; url=Futures%20Average%20Calculator.html">
-  <title>Futures Average Calculator</title>
+  <title>Average Calculators</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body { display: flex; flex-direction: column; background: #f6f7f9; color: #14181f; font: 15px/1.4 system-ui, sans-serif; }
+    [role="tablist"] { display: flex; gap: 6px; padding: 8px 14px 0; border-bottom: 1px solid #e2e5ea; background: #fff; }
+    [role="tab"] { padding: 10px 14px; border: 0; border-bottom: 3px solid transparent; background: transparent; color: #667085; font: inherit; font-weight: 600; cursor: pointer; }
+    [role="tab"][aria-selected="true"] { border-bottom-color: #2962ff; color: #14181f; }
+    [role="tab"]:focus-visible { outline: 2px solid #2962ff; outline-offset: -2px; }
+    main { flex: 1; min-height: 0; }
+    [role="tabpanel"] { height: 100%; }
+    iframe { display: block; width: 100%; height: 100%; border: 0; }
+  </style>
 </head>
 <body>
-  <p>Opening the calculator. If you are not redirected, <a href="Futures%20Average%20Calculator.html">open it here</a>.</p>
+  <div role="tablist" aria-label="Average calculators">
+    <button id="futures-tab" type="button" role="tab" aria-selected="true" aria-controls="futures-panel" tabindex="0">Futures Average</button>
+    <button id="options-tab" type="button" role="tab" aria-selected="false" aria-controls="options-panel" tabindex="-1">Option Selling Average</button>
+  </div>
+  <main>
+    <section id="futures-panel" role="tabpanel" aria-labelledby="futures-tab">
+      <iframe title="Futures Average Calculator" src="Futures%20Average%20Calculator.html"></iframe>
+    </section>
+    <section id="options-panel" role="tabpanel" aria-labelledby="options-tab" hidden>
+      <iframe title="Option Selling Average Calculator" src="Option%20Selling%20Average%20Calculator.html"></iframe>
+    </section>
+  </main>
+  <script>
+    const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
+
+    function selectTab(selected) {
+      tabs.forEach(tab => {
+        const active = tab === selected;
+        tab.setAttribute('aria-selected', String(active));
+        tab.tabIndex = active ? 0 : -1;
+        document.getElementById(tab.getAttribute('aria-controls')).hidden = !active;
+      });
+    }
+
+    tabs.forEach((tab, index) => {
+      tab.addEventListener('click', () => selectTab(tab));
+      tab.addEventListener('keydown', event => {
+        let next;
+        if (event.key === 'ArrowRight' || event.key === 'ArrowDown') next = (index + 1) % tabs.length;
+        else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') next = (index + tabs.length - 1) % tabs.length;
+        else if (event.key === 'Home') next = 0;
+        else if (event.key === 'End') next = tabs.length - 1;
+        else return;
+        event.preventDefault();
+        tabs[next].focus();
+        selectTab(tabs[next]);
+      });
+    });
+  </script>
 </body>
 </html>

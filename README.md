@@ -1,7 +1,8 @@
-# Futures Average Calculator
+# Average Calculators
 
-A single-page futures averaging calculator. Open `index.html` to be redirected to the calculator, or open `Futures Average Calculator.html` directly. All calculations run locally in your browser; no data is saved or sent anywhere.
+The homepage has two tabs:
 
-The calculator supports long and short positions, multiple trade entries, average-price planning, and exit targets. Lot size and trade values are editable. Brokerage, taxes, and other charges are not included; this is an analytical tool, not financial advice.
+- **Futures Average** for planning long or short futures entries.
+- **Option Selling Average** for option premium averaging, breakeven, targets, and stop loss.
 
-The site is hosted with GitHub Pages at [premg001.github.io/OptionSellingCalculator](https://premg001.github.io/OptionSellingCalculator/).
+Open `index.html` locally or visit the hosted site at [premg001.github.io/OptionSellingCalculator](https://premg001.github.io/OptionSellingCalculator/). Each calculator runs in your browser; no data is saved or sent anywhere. Brokerage, taxes, and other charges are not included. This is an analytical tool, not financial advice.
